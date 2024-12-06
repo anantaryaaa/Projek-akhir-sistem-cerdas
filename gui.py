@@ -30,6 +30,16 @@ class FullScreenCameraApp:
         self.eraser_button = Button(self.button_frame, text="Toggle Eraser", command=self.toggle_eraser, bg="blue", fg="white")
         self.eraser_button.pack(side=LEFT, padx=10)
 
+        # Color buttons
+        self.red_button = Button(self.button_frame, text="Red", command=lambda: self.change_color((0, 0, 255)), bg="red", fg="white")
+        self.red_button.pack(side=LEFT, padx=5)
+
+        self.green_button = Button(self.button_frame, text="Green", command=lambda: self.change_color((0, 255, 0)), bg="green", fg="white")
+        self.green_button.pack(side=LEFT, padx=5)
+
+        self.blue_button = Button(self.button_frame, text="Blue", command=lambda: self.change_color((255, 0, 0)), bg="blue", fg="white")
+        self.blue_button.pack(side=LEFT, padx=5)
+
         # Exit button
         self.exit_button = Button(self.button_frame, text="Exit", command=self.close_app, bg="red", fg="white")
         self.exit_button.pack(side=RIGHT, padx=10)
@@ -41,10 +51,14 @@ class FullScreenCameraApp:
     def toggle_eraser(self):
         self.virtual_painter.toggle_eraser()
 
+    def change_color(self, color):
+        self.virtual_painter.change_color(color)
+
     def close_app(self):
         # Stop virtual painter and close application
         self.virtual_painter.stop_painting()
         self.root.destroy()
+
 
 # Main
 if __name__ == "__main__":
