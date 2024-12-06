@@ -22,9 +22,17 @@ class VirtualPainter:
         # Eraser mode
         self.is_eraser = False
 
+        # Current color
+        self.current_color = (0, 0, 255)  # Default to red
+
     def toggle_eraser(self):
         # Toggle eraser mode
         self.is_eraser = not self.is_eraser
+
+    def change_color(self, color):
+        # Change current drawing color
+        self.current_color = color
+        self.is_eraser = False  # Disable eraser when changing color
 
     def start_painting(self):
         if not self.running:
@@ -50,7 +58,7 @@ class VirtualPainter:
 
                 # Set thickness based on mode
                 thickness = 50 if self.is_eraser else 15
-                color = (0, 0, 0) if self.is_eraser else (0, 0, 255)
+                color = (0, 0, 0) if self.is_eraser else self.current_color
 
                 # Draw line if not the first point
                 if self.px == 0 and self.py == 0:
