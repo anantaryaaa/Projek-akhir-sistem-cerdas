@@ -29,15 +29,16 @@ class CanvasApp:
         self.root = root
         self.root.title("Canvas")
         Label(root, text="Canvas Area", font=("Arial", 36)).pack(pady=20)
-        self.canvas = Canvas(root, bg="white", width=root.winfo_screenwidth(), height=root.winfo_screenheight() - 180)
+        self.canvas_width = root.winfo_screenwidth()
+        self.canvas_height = root.winfo_screenheight() - 180
+        self.canvas = Canvas(root, bg="white", width=self.canvas_width, height=self.canvas_height)
         self.canvas.pack(pady=10)
 
-        # Copying button setup from FullScreenCameraApp
         self.setup_buttons()
 
         # Initialize camera for hand detection
         self.cap = cv2.VideoCapture(0)
-        self.detector = handDetector()  # Assuming you have a handDetector class for finding hand landmarks
+        self.detector = handDetector()
 
         # Previous point coordinates
         self.px, self.py = 0, 0
@@ -99,20 +100,25 @@ class CanvasApp:
                 # Get index finger tip coordinates
                 x, y = lm_list[8][1], lm_list[8][2]
 
+                # Map coordinates to canvas dimensions
+                frame_height, frame_width, _ = img.shape
+                mapped_x = int(x / frame_width * self.canvas_width)
+                mapped_y = int(y / frame_height * self.canvas_height)
+
                 # Set thickness
                 thickness = 50 if self.color == "white" else 5
                 paint_color = "white" if self.color == "white" else self.color
 
                 # Draw line on the canvas with detected hand position
                 if self.px == 0 and self.py == 0:
-                    self.px, self.py = x, y
+                    self.px, self.py = mapped_x, mapped_y
                 else:
-                    self.canvas.create_line(self.px, self.py, x, y,
+                    self.canvas.create_line(self.px, self.py, mapped_x, mapped_y,
                                             width=thickness, fill=paint_color,
                                             capstyle=ROUND, smooth=TRUE, splinesteps=36)
 
                 # Update previous point
-                self.px, self.py = x, y
+                self.px, self.py = mapped_x, mapped_y
             else:
                 # Reset previous point when hand not detected
                 self.px, self.py = 0, 0
@@ -170,7 +176,7 @@ class FullScreenCameraApp:
         self.exit_button.pack(side=RIGHT, padx=10)
 
         # Initialize VirtualPainter
-        self.virtual_painter = VirtualPainter(root, self.video_frame)
+        self.virtual_painter = VirtualPainter2(root, self.video_frame)
         self.virtual_painter.start_painting()  # Start painting functionality
 
     def toggle_eraser(self):
@@ -266,6 +272,96 @@ class VirtualPainter:
 
             # Resize frame to fit GUI window
             img = cv2.resize(combined_canvas, (self.video_label.winfo_width(), self.video_label.winfo_height()))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            imgtk = ImageTk.PhotoImage(image=Image.fromarray(img))
+            self.video_label.imgtk = imgtk
+            self.video_label.config(image=imgtk)
+
+            # Continue updating the frame
+            self.root.after(10, self.update_frame)
+
+    def stop_painting(self):
+        self.running = False
+        if self.cap:
+            self.cap.release()
+        self.canvas = np.zeros((480, 640, 3), np.uint8)
+
+class VirtualPainter2:
+    def __init__(self, root, video_label):
+        self.root = root
+        self.video_label = video_label
+        self.running = False
+
+        # Initialize camera
+        self.cap = cv2.VideoCapture(0)
+        self.detector = handDetector()
+
+        # Create canvas for drawing
+        self.canvas = np.zeros((480, 640, 3), np.uint8)
+
+        # Previous point coordinates
+        self.px, self.py = 0, 0
+
+        # Eraser mode
+        self.is_eraser = False
+
+        # Current color
+        self.current_color = (0, 0, 255)  # Default to red
+
+    def toggle_eraser(self):
+        # Toggle eraser mode
+        self.is_eraser = not self.is_eraser
+
+    def change_color(self, color):
+        # Change current drawing color
+        self.current_color = color
+        self.is_eraser = False  # Disable eraser when changing color
+
+    def start_painting(self):
+        if not self.running:
+            self.running = True
+            self.update_frame()
+
+    def update_frame(self):
+        if self.running:
+            success, img = self.cap.read()
+            if not success:
+                self.stop_painting()
+                return
+
+            img = cv2.flip(img, 1)  # Mirror image
+
+            # Find hand landmarks
+            img = self.detector.findHands(img)
+            lm_list = self.detector.findPosition(img, draw=False)
+
+            if len(lm_list) > 0:  # If hand detected
+                # Get index finger tip coordinates
+                x, y = lm_list[8][1], lm_list[8][2]
+
+                # Set thickness based on mode
+                thickness = 50 if self.is_eraser else 15
+                color = (0, 0, 0) if self.is_eraser else self.current_color
+
+                # Draw line if not the first point
+                if self.px == 0 and self.py == 0:
+                    self.px, self.py = x, y
+                else:
+                    # Draw on both canvas and image
+                    cv2.line(self.canvas, (self.px, self.py), (x, y), color, thickness)
+                    cv2.line(img, (self.px, self.py), (x, y), color, thickness)
+
+                # Update previous point
+                self.px, self.py = x, y
+            else:
+                # Reset previous point when hand not detected
+                self.px, self.py = 0, 0
+
+            # Combine canvas and camera feed
+            img = cv2.add(img, self.canvas)
+
+            # Resize frame to fit GUI window
+            img = cv2.resize(img, (self.video_label.winfo_width(), self.video_label.winfo_height()))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             imgtk = ImageTk.PhotoImage(image=Image.fromarray(img))
             self.video_label.imgtk = imgtk
